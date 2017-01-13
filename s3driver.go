@@ -87,10 +87,30 @@ func (d S3Driver) ListDir(path string) ([]os.FileInfo, error) {
 			if *o.Key == prefix {
 				continue
 			}
+
+			// Check if the S3 object metadata contains a "Last-Modified" value and if so,
+			// override the S3 object's own last modified timestamp.
+			// This is because the S3 PUT command does not let you explicitly specify the
+			// last modified timestamp, but sometimes we want to preserve it from a file
+			// being uploaded rather than reset it to when it was uploaded to S3.
+			lastModified := *o.LastModified
+			obj, err := d.s3.GetObject(&s3.GetObjectInput{
+				Bucket: aws.String(d.bucket),
+				Key:    aws.String(*o.Key),
+			})
+			if err == nil {
+				lastModifiedFromMetadata, ok := obj.Metadata["Last-Modified"]
+				if ok {
+					if m, err := time.Parse("2006-01-02 15:04:05 -0700 MST", *lastModifiedFromMetadata); err == nil {
+						lastModified = m
+					}
+				}
+			}
+
 			files = append(files, &fileInfo{
 				name:  strings.TrimPrefix(*o.Key, prefix),
 				size:  *o.Size,
-				mtime: *o.LastModified,
+				mtime: lastModified,
 			})
 		}
 		for _, o := range objects.CommonPrefixes {

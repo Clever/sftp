@@ -355,6 +355,7 @@ func testServer(t *testing.T, useSubsystem bool, readonly bool) (net.Listener, s
 		}
 	}()
 
+	fmt.Println(host, port)
 	return listener, host, port
 }
 
@@ -385,7 +386,9 @@ func runSftpClient(t *testing.T, script string, path string, host string, port i
 
 func TestServerCompareSubsystems(t *testing.T) {
 	listenerGo, hostGo, portGo := testServer(t, GOLANG_SFTP, READONLY)
+	fmt.Println("listenerGo", hostGo, portGo)
 	listenerOp, hostOp, portOp := testServer(t, OPENSSH_SFTP, READONLY)
+	fmt.Println("listenerOp", hostOp, portOp)
 	defer listenerGo.Close()
 	defer listenerOp.Close()
 
@@ -397,11 +400,13 @@ ls /bin/
 ls /usr/bin/
 `
 	outputGo, err := runSftpClient(t, script, "/", hostGo, portGo)
+	fmt.Println(outputGo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	outputOp, err := runSftpClient(t, script, "/", hostOp, portOp)
+	fmt.Println(outputOp)
 	if err != nil {
 		t.Fatal(err)
 	}

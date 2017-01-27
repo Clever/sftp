@@ -27,9 +27,9 @@ import (
 )
 
 var testSftpClientBin = flag.String("sftp_client", "/usr/bin/sftp", "location of the sftp client binary")
-var sshServerDebugStream = ioutil.Discard
-var sftpServerDebugStream = ioutil.Discard
-var sftpClientDebugStream = ioutil.Discard
+var sshServerDebugStream = os.Stdout
+var sftpServerDebugStream = os.Stdout
+var sftpClientDebugStream = os.Stdout
 
 const (
 	GOLANG_SFTP  = true
@@ -337,6 +337,8 @@ func testServer(t *testing.T, useSubsystem bool, readonly bool) (net.Listener, s
 	go func() {
 		for {
 			conn, err := listener.Accept()
+			fmt.Println("conn: ", conn)
+			fmt.Println("conn err: ", err)
 			if err != nil {
 				fmt.Fprintf(sshServerDebugStream, "ssh server socket closed: %v\n", err)
 				break

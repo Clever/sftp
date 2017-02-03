@@ -10,6 +10,7 @@ checkout:
 dependencies:
   override:
   - go get -t -v ./...
+  - ssh-keygen -t rsa -q -P "" -f $HOME/.ssh/id_rsa
 test:
   override:
   - go test -integration -v ./...

@@ -27,9 +27,9 @@ import (
 )
 
 var testSftpClientBin = flag.String("sftp_client", "/usr/bin/sftp", "location of the sftp client binary")
-var sshServerDebugStream = ioutil.Discard
-var sftpServerDebugStream = ioutil.Discard
-var sftpClientDebugStream = ioutil.Discard
+var sshServerDebugStream = os.Stdout
+var sftpServerDebugStream = os.Stdout
+var sftpClientDebugStream = os.Stdout
 
 const (
 	GOLANG_SFTP  = true
@@ -337,6 +337,8 @@ func testServer(t *testing.T, useSubsystem bool, readonly bool) (net.Listener, s
 	go func() {
 		for {
 			conn, err := listener.Accept()
+			fmt.Println("conn: ", conn)
+			fmt.Println("conn err: ", err)
 			if err != nil {
 				fmt.Fprintf(sshServerDebugStream, "ssh server socket closed: %v\n", err)
 				break
@@ -355,12 +357,11 @@ func testServer(t *testing.T, useSubsystem bool, readonly bool) (net.Listener, s
 		}
 	}()
 
+	fmt.Println(host, port)
 	return listener, host, port
 }
 
 func runSftpClient(t *testing.T, script string, path string, host string, port int) (string, error) {
-	t.Skip("skip sftp binary test")
-
 	// if sftp client binary is unavailable, skip test
 	if _, err := os.Stat(*testSftpClientBin); err != nil {
 		t.Skip("sftp client binary unavailable")
@@ -387,7 +388,9 @@ func runSftpClient(t *testing.T, script string, path string, host string, port i
 
 func TestServerCompareSubsystems(t *testing.T) {
 	listenerGo, hostGo, portGo := testServer(t, GOLANG_SFTP, READONLY)
+	fmt.Println("listenerGo", hostGo, portGo)
 	listenerOp, hostOp, portOp := testServer(t, OPENSSH_SFTP, READONLY)
+	fmt.Println("listenerOp", hostOp, portOp)
 	defer listenerGo.Close()
 	defer listenerOp.Close()
 
@@ -399,11 +402,13 @@ ls /bin/
 ls /usr/bin/
 `
 	outputGo, err := runSftpClient(t, script, "/", hostGo, portGo)
+	fmt.Println(outputGo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	outputOp, err := runSftpClient(t, script, "/", hostOp, portOp)
+	fmt.Println(outputOp)
 	if err != nil {
 		t.Fatal(err)
 	}

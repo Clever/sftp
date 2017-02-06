@@ -3,7 +3,6 @@ package sftp
 import (
 	"encoding"
 	"io"
-	"log"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -51,11 +50,7 @@ func (c *clientConn) loop() {
 // recv continuously reads from the server and forwards responses to the
 // appropriate channel.
 func (c *clientConn) recv() error {
-	defer func() {
-		c.Lock()
-		c.conn.Close()
-		c.Unlock()
-	}()
+	defer c.conn.Close()
 	for {
 		typ, data, err := c.recvPacket()
 		if err != nil {
@@ -123,8 +118,5 @@ type serverConn struct {
 }
 
 func (s *serverConn) sendError(p id, err error) error {
-	if err != nil && err != io.EOF {
-		log.Println("Sending error:", err)
-	}
 	return s.sendPacket(statusFromError(p, err))
 }

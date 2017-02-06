@@ -1,0 +1,21 @@
+machine:
+  post:
+  - cd $HOME && git clone --depth 1 -v git@github.com:clever/ci-scripts.git && cd ci-scripts && git show --oneline -s
+  - $HOME/ci-scripts/circleci/golang-install 1.7
+  services:
+  - docker
+checkout:
+  post:
+  - $HOME/ci-scripts/circleci/golang-move-project
+dependencies:
+  override:
+  - go get -t -v ./...
+  - ssh-keygen -t rsa -q -P "" -f $HOME/.ssh/id_rsa
+test:
+  override:
+    - docker build -f Dockerfile.test -t local/golang-ssh .
+    - docker run -w /go/src/github.com/Clever/sftp -v /home/ubuntu/.go_workspace/src/github.com/Clever/sftp:/go/src/github.com/Clever/sftp -it local/golang-ssh make test-circle
+  post:
+  - $HOME/ci-scripts/circleci/report-card $RC_DOCKER_USER $RC_DOCKER_PASS "$RC_DOCKER_EMAIL" $RC_GITHUB_TOKEN
+general:
+  build_dir: ../.go_workspace/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME

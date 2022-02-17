@@ -2,6 +2,7 @@ package sftp
 
 import (
 	"bytes"
+	"log"
 	"testing"
 	"time"
 
@@ -10,6 +11,20 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
+
+// mockLogger and its methods are placeholders for a passed in Logger.
+// It matches a subset of the Clever/kayvee-go library.
+type mockLogger struct{}
+
+func (mockLogger mockLogger) InfoD(title string, meta map[string]interface{}) {
+	log.Println("Title:", title)
+	log.Println("Meta:", meta)
+}
+
+func (mockLogger mockLogger) ErrorD(title string, meta map[string]interface{}) {
+	log.Println("Title:", title)
+	log.Println("Meta:", meta)
+}
 
 func TestTranslatePath(t *testing.T) {
 	testCases := []struct {
@@ -275,6 +290,7 @@ func TestGetFile(t *testing.T) {
 		s3:       mockS3API,
 		bucket:   "bucket",
 		homePath: "home",
+		lg:       mockLogger{},
 	}
 	_, err := driver.GetFile("../../dir/file")
 
@@ -297,6 +313,7 @@ func TestPutFile(t *testing.T) {
 		s3:       mockS3API,
 		bucket:   "bucket",
 		homePath: "home",
+		lg:       mockLogger{},
 	}
 	err := driver.PutFile("../../dir/file", bytes.NewReader([]byte{1, 2, 3}))
 
@@ -322,6 +339,7 @@ func TestPutFileWithKmsKeyID(t *testing.T) {
 		bucket:   "bucket",
 		homePath: "home",
 		kmsKeyID: &kmsKeyID,
+		lg:       mockLogger{},
 	}
 	err := driver.PutFile("../../dir/file", bytes.NewReader([]byte{1, 2, 3}))
 

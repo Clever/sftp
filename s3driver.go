@@ -13,6 +13,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"gopkg.in/Clever/kayvee-go.v6/logger"
+)
+
+const (
+	serviceName = "sftp"
+)
+
+var (
+	lg = logger.New(serviceName)
 )
 
 type S3 interface {
@@ -210,6 +219,12 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	lg.InfoD("s3Driver-get-file-success", logger.M{
+		"district_id":     d.bucket,
+		"method":          "GET",
+		"path":            localPath,
+		"file_bytes_size": obj.ContentLength,
+	})
 	return obj.Body, nil
 }
 
@@ -235,7 +250,16 @@ func (d S3Driver) PutFile(path string, r io.Reader) error {
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
 	_, err = d.s3.PutObject(input)
-	return err
+	if err != nil {
+		return err
+	}
+	lg.InfoD("s3Driver-put-file-success", logger.M{
+		"district_id":     d.bucket,
+		"method":          "PUT",
+		"path":            localPath,
+		"file_bytes_size": input.ContentLength,
+	})
+	return nil
 }
 
 func (d S3Driver) RealPath(path string) string {

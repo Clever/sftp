@@ -13,15 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"gopkg.in/Clever/kayvee-go.v6/logger"
-)
-
-const (
-	serviceName = "sftp"
-)
-
-var (
-	lg = logger.New(serviceName)
 )
 
 type S3 interface {
@@ -38,6 +29,7 @@ type S3Driver struct {
 	prefix   string
 	homePath string
 	kmsKeyID *string
+	lg       Logger
 }
 
 func (d S3Driver) Stat(path string) (os.FileInfo, error) {
@@ -219,7 +211,7 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	lg.InfoD("s3Driver-get-file-success", logger.M{
+	d.lg.InfoD("s3Driver-get-file-success", meta{
 		"district_id":     d.bucket,
 		"method":          "GET",
 		"path":            localPath,
@@ -253,7 +245,7 @@ func (d S3Driver) PutFile(path string, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	lg.InfoD("s3Driver-put-file-success", logger.M{
+	d.lg.InfoD("s3Driver-put-file-success", meta{
 		"district_id":     d.bucket,
 		"method":          "PUT",
 		"path":            localPath,
@@ -296,7 +288,7 @@ func TranslatePath(prefix, home, path string) (string, error) {
 // bucket: name of S3 bucket
 // prefix: key within the S3 bucket, if applicable
 // homePath: default home directory for user (can be different from prefix)
-func NewS3Driver(bucket, prefix, homePath, region, awsAccessKeyID, awsSecretKey, awsToken string, kmsKeyID *string) *S3Driver {
+func NewS3Driver(bucket, prefix, homePath, region, awsAccessKeyID, awsSecretKey, awsToken string, kmsKeyID *string, lg Logger) *S3Driver {
 	config := aws.NewConfig().
 		WithRegion(region).
 		WithCredentials(credentials.NewStaticCredentials(awsAccessKeyID, awsSecretKey, awsToken))
@@ -307,5 +299,6 @@ func NewS3Driver(bucket, prefix, homePath, region, awsAccessKeyID, awsSecretKey,
 		prefix:   prefix,
 		homePath: homePath,
 		kmsKeyID: kmsKeyID,
+		lg:       lg,
 	}
 }

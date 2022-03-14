@@ -105,6 +105,7 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 					MACs:    macs,
 				},
 				PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+					m.lg.InfoD("handshake-failure-username-password", meta{"username": c.User()})
 					driver = m.driverGenerator(LoginRequest{
 						Username:   c.User(),
 						Password:   string(pass),
@@ -117,6 +118,7 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 					return nil, nil
 				},
 				PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+					m.lg.InfoD("handshake-failure-username-publickey", meta{"username": c.User()})
 					driver = m.driverGenerator(LoginRequest{
 						Username:   c.User(),
 						Password:   "",

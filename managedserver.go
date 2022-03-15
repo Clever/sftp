@@ -138,7 +138,7 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 			_, newChan, requestChan, err := ssh.NewServerConn(conn, config)
 			if err != nil {
 				if err != io.EOF {
-					m.errorAndAlert("handshake-failure", meta{"error": err.Error()})
+					m.errorAndAlert("handshake-failure", meta{"error": err.Error(), "IP": conn.RemoteAddr()})
 				}
 				return
 			}

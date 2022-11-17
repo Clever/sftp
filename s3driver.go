@@ -16,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+var BLOCK_DOWNLOADS_IP_ADDRESSES []string
+
 type S3 interface {
 	ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error)
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
@@ -242,6 +244,14 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 	if _, ok := denyList[d.prefix]; ok {
 		return nil, fmt.Errorf("not supported")
 	}
+
+	ip, port := getIPAndPort(d.remoteIPAddress)
+	for _, blockedIP := range BLOCK_DOWNLOADS_IP_ADDRESSES {
+		if ip == blockedIP {
+			return nil, fmt.Errorf("not supported")
+		}
+	}
+
 	localPath, err := TranslatePath(d.prefix, d.homePath, path)
 	if err != nil {
 		return nil, err
@@ -253,7 +263,7 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	ip, port := getIPAndPort(d.remoteIPAddress)
+
 	if d.lg != nil {
 		d.lg.InfoD("s3-get-file-success", meta{
 			"district_id":     d.prefix,
@@ -358,6 +368,13 @@ func NewS3Driver(
 		WithRegion(region).
 		WithCredentials(credentials.NewStaticCredentials(awsAccessKeyID, awsSecretKey, awsToken))
 	s3 := s3.New(session.New(), config)
+
+	blockDownloadIPAddressesStr := os.Getenv("BLOCK_DOWNLOADS_IP_ADDRESSES")
+	BLOCK_DOWNLOADS_IP_ADDRESSES = []string{}
+	for _, addr := range strings.Split(blockDownloadIPAddressesStr, ",") {
+		BLOCK_DOWNLOADS_IP_ADDRESSES = append(BLOCK_DOWNLOADS_IP_ADDRESSES, strings.TrimSpace(addr))
+	}
+
 	return &S3Driver{
 		s3:              s3,
 		bucket:          bucket,

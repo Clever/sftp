@@ -281,6 +281,26 @@ func TestGetFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestGetFileFromBlockedIPAddress(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockS3API := NewMockS3API(mockCtrl)
+
+	BLOCK_DOWNLOADS_IP_ADDRESSES = []string{"1.1.1.1"}
+
+	driver := &S3Driver{
+		s3:              mockS3API,
+		bucket:          "bucket",
+		homePath:        "home",
+		remoteIPAddress: "1.1.1.1:1234",
+	}
+	_, err := driver.GetFile("../../dir/file")
+
+	assert.Error(t, err)
+
+	BLOCK_DOWNLOADS_IP_ADDRESSES = []string{}
+}
+
 func TestPutFile(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

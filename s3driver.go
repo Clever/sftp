@@ -241,13 +241,29 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 		"6359869802626ad09401b198": "",
 		"635c47c9b773024858b7ce2e": "",
 	}
+	ip, port := getIPAndPort(d.remoteIPAddress)
 	if _, ok := denyList[d.prefix]; ok {
+		d.lg.ErrorD("s3-get-file-blocked-district", meta{
+			"district_id": d.prefix,
+			"s3_bucket":   d.bucket,
+			"method":      "GET",
+			"path":        path,
+			"client-ip":   ip,
+			"client-port": port,
+		})
 		return nil, fmt.Errorf("not supported")
 	}
 
-	ip, port := getIPAndPort(d.remoteIPAddress)
 	for _, blockedIP := range BLOCK_DOWNLOADS_IP_ADDRESSES {
 		if ip == blockedIP {
+			d.lg.ErrorD("s3-get-file-blocked-ip", meta{
+				"district_id": d.prefix,
+				"s3_bucket":   d.bucket,
+				"method":      "GET",
+				"path":        path,
+				"client-ip":   ip,
+				"client-port": port,
+			})
 			return nil, fmt.Errorf("not supported")
 		}
 	}

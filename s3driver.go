@@ -217,7 +217,6 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 		"5d94ff814070e90001c74ae9": "",
 		"562a767542fcde0100000cd3": "",
 		"5d727c3d091c7a0001b6167b": "",
-		"577ec13a78ef4c010000010c": "",
 		"5a2eae046e18690001b2b671": "",
 		"596923cd7eb87f000134bd31": "",
 		"5d96661ed0c8470001afd962": "",

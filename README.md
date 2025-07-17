@@ -1,5 +1,4 @@
-sftp
-----
+## sftp
 
 The `sftp` package provides support for file system operations on remote ssh servers using the SFTP subsystem.
 
@@ -9,8 +8,7 @@ adds a ManagedServer component that can be used to easily create a server with a
 
 Tests that depend on the details of the file system server (mostly client tests) are being skipped.
 
-usage and examples
-------------------
+## usage and examples
 
 See [godoc.org/github.com/pkg/sftp](http://godoc.org/github.com/pkg/sftp) for examples and usage.
 
@@ -18,14 +16,17 @@ The basic operation of the package mirrors the facilities of the [os](http://gol
 
 The Walker interface for directory traversal is heavily inspired by Keith Rarick's [fs](http://godoc.org/github.com/kr/fs) package.
 
-roadmap
--------
+## roadmap
 
- * There is way too much duplication in the Client methods. If there was an unmarshal(interface{}) method this would reduce a heap of the duplication.
+- There is way too much duplication in the Client methods. If there was an unmarshal(interface{}) method this would reduce a heap of the duplication.
 
-contributing
-------------
+## contributing
 
 We welcome pull requests, bug fixes and issue reports.
 
 Before proposing a large change, first please discuss your change by raising an issue.
+
+## CI
+
+If CI is failing on a PR, it can still be merged in (this is not a deployed service)
+We use this package in our clever-sftp service.

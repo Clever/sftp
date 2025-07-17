@@ -2,6 +2,7 @@ package sftp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,20 +11,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 var BLOCK_DOWNLOADS_IP_ADDRESSES []string
 
 type S3 interface {
-	ListObjectsV2(input *s3.ListObjectsV2Input) (*s3.ListObjectsV2Output, error)
-	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
-	CopyObject(input *s3.CopyObjectInput) (*s3.CopyObjectOutput, error)
-	PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error)
-	GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error)
+	ListObjectsV2(ctx context.Context, input *s3.ListObjectsV2Input, opts ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	DeleteObject(ctx context.Context, input *s3.DeleteObjectInput, opts ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	CopyObject(ctx context.Context, input *s3.CopyObjectInput, opts ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
+	PutObject(ctx context.Context, input *s3.PutObjectInput, opts ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	GetObject(ctx context.Context, input *s3.GetObjectInput, opts ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
 type S3Driver struct {
@@ -42,10 +44,10 @@ func (d S3Driver) Stat(path string) (os.FileInfo, error) {
 		return nil, err
 	}
 
-	resp, err := d.s3.ListObjectsV2(&s3.ListObjectsV2Input{
+	resp, err := d.s3.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 		Bucket:  aws.String(d.bucket),
 		Prefix:  aws.String(localPath),
-		MaxKeys: aws.Int64(1),
+		MaxKeys: aws.Int32(1),
 	})
 	if err != nil {
 		return nil, err
@@ -79,7 +81,7 @@ func (d S3Driver) ListDir(path string) ([]os.FileInfo, error) {
 	var nextContinuationToken *string
 	files := []os.FileInfo{}
 	for {
-		objects, err := d.s3.ListObjectsV2(&s3.ListObjectsV2Input{
+		objects, err := d.s3.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 			Bucket:            aws.String(d.bucket),
 			Prefix:            aws.String(prefix),
 			Delimiter:         aws.String("/"),
@@ -127,7 +129,7 @@ func (d S3Driver) DeleteDir(path string) error {
 		directoryPath = translatedPath + "/"
 	}
 
-	_, err = d.s3.DeleteObject(&s3.DeleteObjectInput{
+	_, err = d.s3.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(d.bucket),
 		Key:    aws.String(directoryPath),
 	})
@@ -139,7 +141,7 @@ func (d S3Driver) DeleteFile(path string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.s3.DeleteObject(&s3.DeleteObjectInput{
+	_, err = d.s3.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(d.bucket),
 		Key:    aws.String(translatedPath),
 	})
@@ -161,16 +163,16 @@ func (d S3Driver) Rename(oldpath string, newpath string) error {
 		Key:        &translatedNewpath,
 	}
 	if d.kmsKeyID == nil {
-		input.ServerSideEncryption = aws.String("AES256")
+		input.ServerSideEncryption = types.ServerSideEncryptionAes256
 	} else {
-		input.ServerSideEncryption = aws.String("aws:kms")
+		input.ServerSideEncryption = types.ServerSideEncryptionAwsKms
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
-	if _, err := d.s3.CopyObject(input); err != nil {
+	if _, err := d.s3.CopyObject(context.Background(), input); err != nil {
 		return err
 	}
 
-	if _, err = d.s3.DeleteObject(&s3.DeleteObjectInput{
+	if _, err = d.s3.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(d.bucket),
 		Key:    &translatedOldpath,
 	}); err != nil {
@@ -194,12 +196,12 @@ func (d S3Driver) MakeDir(path string) error {
 		Body:   bytes.NewReader([]byte{}),
 	}
 	if d.kmsKeyID == nil {
-		input.ServerSideEncryption = aws.String("AES256")
+		input.ServerSideEncryption = types.ServerSideEncryptionAes256
 	} else {
-		input.ServerSideEncryption = aws.String("aws:kms")
+		input.ServerSideEncryption = types.ServerSideEncryptionAwsKms
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
-	_, err = d.s3.PutObject(input)
+	_, err = d.s3.PutObject(context.Background(), input)
 	return err
 }
 
@@ -271,7 +273,7 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	obj, err := d.s3.GetObject(&s3.GetObjectInput{
+	obj, err := d.s3.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(d.bucket),
 		Key:    aws.String(localPath),
 	})
@@ -309,12 +311,12 @@ func (d S3Driver) PutFile(path string, r io.Reader) error {
 		Body:   bytes.NewReader(rawData),
 	}
 	if d.kmsKeyID == nil {
-		input.ServerSideEncryption = aws.String("AES256")
+		input.ServerSideEncryption = types.ServerSideEncryptionAes256
 	} else {
-		input.ServerSideEncryption = aws.String("aws:kms")
+		input.ServerSideEncryption = types.ServerSideEncryptionAwsKms
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
-	_, err = d.s3.PutObject(input)
+	_, err = d.s3.PutObject(context.Background(), input)
 	if err != nil {
 		return err
 	}
@@ -379,10 +381,14 @@ func NewS3Driver(
 	kmsKeyID *string,
 	lg Logger,
 ) *S3Driver {
-	config := aws.NewConfig().
-		WithRegion(region).
-		WithCredentials(credentials.NewStaticCredentials(awsAccessKeyID, awsSecretKey, awsToken))
-	s3 := s3.New(session.New(), config)
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(region),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(awsAccessKeyID, awsSecretKey, awsToken)),
+	)
+	if err != nil {
+		panic(err)
+	}
+	s3Client := s3.NewFromConfig(cfg)
 
 	blockDownloadIPAddressesStr := os.Getenv("BLOCK_DOWNLOADS_IP_ADDRESSES")
 	BLOCK_DOWNLOADS_IP_ADDRESSES = []string{}
@@ -391,7 +397,7 @@ func NewS3Driver(
 	}
 
 	return &S3Driver{
-		s3:              s3,
+		s3:              s3Client,
 		bucket:          bucket,
 		prefix:          prefix,
 		homePath:        homePath,

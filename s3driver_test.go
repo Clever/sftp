@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -69,14 +70,14 @@ func TestStat(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().ListObjectsV2(&s3.ListObjectsV2Input{
+	mockS3API.EXPECT().ListObjectsV2(gomock.Any(), &s3.ListObjectsV2Input{
 		Bucket:  aws.String("bucket"),
 		Prefix:  aws.String("home/dir/file"),
-		MaxKeys: aws.Int64(1),
+		MaxKeys: aws.Int32(1),
 	}).Return(&s3.ListObjectsV2Output{
-		KeyCount: aws.Int64(1),
-		Contents: []*s3.Object{
-			&s3.Object{Key: aws.String("file"), Size: aws.Int64(123), LastModified: aws.Time(time.Now())},
+		KeyCount: aws.Int32(1),
+		Contents: []types.Object{
+			{Key: aws.String("file"), Size: aws.Int64(123), LastModified: aws.Time(time.Now())},
 		},
 	}, nil)
 
@@ -97,18 +98,18 @@ func TestListDir(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().ListObjectsV2(&s3.ListObjectsV2Input{
+	mockS3API.EXPECT().ListObjectsV2(gomock.Any(), &s3.ListObjectsV2Input{
 		Bucket:    aws.String("bucket"),
 		Prefix:    aws.String("home/dir/"),
 		Delimiter: aws.String("/"),
 	}).Return(&s3.ListObjectsV2Output{
-		KeyCount: aws.Int64(1),
-		Contents: []*s3.Object{
-			&s3.Object{Key: aws.String("file"), Size: aws.Int64(123), LastModified: aws.Time(time.Now())},
-			&s3.Object{Key: aws.String("other_file"), Size: aws.Int64(456), LastModified: aws.Time(time.Now())},
+		KeyCount: aws.Int32(1),
+		Contents: []types.Object{
+			{Key: aws.String("file"), Size: aws.Int64(123), LastModified: aws.Time(time.Now())},
+			{Key: aws.String("other_file"), Size: aws.Int64(456), LastModified: aws.Time(time.Now())},
 		},
-		CommonPrefixes: []*s3.CommonPrefix{
-			&s3.CommonPrefix{Prefix: aws.String("nested_dir/")},
+		CommonPrefixes: []types.CommonPrefix{
+			{Prefix: aws.String("nested_dir/")},
 		},
 		IsTruncated: aws.Bool(false),
 	}, nil)
@@ -135,7 +136,7 @@ func TestDeleteDir(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().DeleteObject(&s3.DeleteObjectInput{
+	mockS3API.EXPECT().DeleteObject(gomock.Any(), &s3.DeleteObjectInput{
 		Bucket: aws.String("bucket"),
 		Key:    aws.String("home/dir/"),
 	}).Return(nil, nil)
@@ -155,7 +156,7 @@ func TestDeleteDirImplicitSlash(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().DeleteObject(&s3.DeleteObjectInput{
+	mockS3API.EXPECT().DeleteObject(gomock.Any(), &s3.DeleteObjectInput{
 		Bucket: aws.String("bucket"),
 		Key:    aws.String("home/dir/"),
 	}).Return(nil, nil)
@@ -175,7 +176,7 @@ func TestDeleteFile(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().DeleteObject(&s3.DeleteObjectInput{
+	mockS3API.EXPECT().DeleteObject(gomock.Any(), &s3.DeleteObjectInput{
 		Bucket: aws.String("bucket"),
 		Key:    aws.String("home/dir/file"),
 	}).Return(nil, nil)
@@ -195,14 +196,14 @@ func TestRename(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().CopyObject(&s3.CopyObjectInput{
+	mockS3API.EXPECT().CopyObject(gomock.Any(), &s3.CopyObjectInput{
 		Bucket:               aws.String("bucket"),
 		CopySource:           aws.String("bucket/home/dir/file"),
 		Key:                  aws.String("home/dir/new_file"),
-		ServerSideEncryption: aws.String("AES256"),
+		ServerSideEncryption: types.ServerSideEncryptionAes256,
 	}).Return(nil, nil)
 
-	mockS3API.EXPECT().DeleteObject(&s3.DeleteObjectInput{
+	mockS3API.EXPECT().DeleteObject(gomock.Any(), &s3.DeleteObjectInput{
 		Bucket: aws.String("bucket"),
 		Key:    aws.String("home/dir/file"),
 	}).Return(nil, nil)
@@ -222,10 +223,10 @@ func TestRelativeMakeDir(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().PutObject(&s3.PutObjectInput{
+	mockS3API.EXPECT().PutObject(gomock.Any(), &s3.PutObjectInput{
 		Bucket:               aws.String("bucket"),
 		Key:                  aws.String("home/new_dir/"),
-		ServerSideEncryption: aws.String("AES256"),
+		ServerSideEncryption: types.ServerSideEncryptionAes256,
 		Body:                 bytes.NewReader([]byte{}),
 	}).Return(nil, nil)
 
@@ -242,10 +243,10 @@ func TestAbsoluteMakeDir(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().PutObject(&s3.PutObjectInput{
+	mockS3API.EXPECT().PutObject(gomock.Any(), &s3.PutObjectInput{
 		Bucket:               aws.String("bucket"),
 		Key:                  aws.String("new_dir/"),
-		ServerSideEncryption: aws.String("AES256"),
+		ServerSideEncryption: types.ServerSideEncryptionAes256,
 		Body:                 bytes.NewReader([]byte{}),
 	}).Return(nil, nil)
 
@@ -264,7 +265,7 @@ func TestGetFile(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().GetObject(&s3.GetObjectInput{
+	mockS3API.EXPECT().GetObject(gomock.Any(), &s3.GetObjectInput{
 		Bucket: aws.String("bucket"),
 		Key:    aws.String("home/dir/file"),
 	}).Return(&s3.GetObjectOutput{
@@ -281,6 +282,11 @@ func TestGetFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+type testLogger struct{}
+
+func (l *testLogger) InfoD(title string, meta map[string]interface{}) {}
+func (l *testLogger) ErrorD(title string, meta map[string]interface{}) {}
+
 func TestGetFileFromBlockedIPAddress(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -293,6 +299,7 @@ func TestGetFileFromBlockedIPAddress(t *testing.T) {
 		bucket:          "bucket",
 		homePath:        "home",
 		remoteIPAddress: "1.1.1.1:1234",
+		lg:              &testLogger{},
 	}
 	_, err := driver.GetFile("../../dir/file")
 
@@ -306,10 +313,10 @@ func TestPutFile(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockS3API := NewMockS3API(mockCtrl)
 
-	mockS3API.EXPECT().PutObject(&s3.PutObjectInput{
+	mockS3API.EXPECT().PutObject(gomock.Any(), &s3.PutObjectInput{
 		Bucket:               aws.String("bucket"),
 		Key:                  aws.String("home/dir/file"),
-		ServerSideEncryption: aws.String("AES256"),
+		ServerSideEncryption: types.ServerSideEncryptionAes256,
 		Body:                 bytes.NewReader([]byte{1, 2, 3}),
 	}).Return(nil, nil)
 
@@ -329,10 +336,10 @@ func TestPutFileWithKmsKeyID(t *testing.T) {
 	mockS3API := NewMockS3API(mockCtrl)
 	kmsKeyID := "123456"
 
-	mockS3API.EXPECT().PutObject(&s3.PutObjectInput{
+	mockS3API.EXPECT().PutObject(gomock.Any(), &s3.PutObjectInput{
 		Bucket:               aws.String("bucket"),
 		Key:                  aws.String("home/dir/file"),
-		ServerSideEncryption: aws.String("aws:kms"),
+		ServerSideEncryption: types.ServerSideEncryptionAwsKms,
 		SSEKMSKeyId:          aws.String(kmsKeyID),
 		Body:                 bytes.NewReader([]byte{1, 2, 3}),
 	}).Return(nil, nil)

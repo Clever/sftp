@@ -37,6 +37,10 @@ type LoginRequest struct {
 	RemoteAddr net.Addr
 }
 
+type subsystemRequest struct {
+	Name string
+}
+
 // ManagedServer is our term for the SFTP server.
 type ManagedServer struct {
 	driverGenerator func(LoginRequest) ServerDriver
@@ -133,7 +137,7 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 				config.AddHostKey(privateKey)
 			}
 
-			_, newChan, requestChan, err := ssh.NewServerConn(conn, config)
+			sshConn, newChan, requestChan, err := ssh.NewServerConn(conn, config)
 			if err != nil {
 				if err != io.EOF {
 					m.errorAndAlert("handshake-failure", meta{"error": err.Error()})
@@ -162,6 +166,7 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 				go func(in <-chan *ssh.Request) {
 					for req := range in {
 						ok := false
+						subsystemName := ""
 						switch req.Type {
 						case "subsystem":
 							if len(req.Payload) >= 4 {
@@ -170,7 +175,18 @@ func (m ManagedServer) Start(port int, rawPrivateKeys [][]byte, ciphers, macs []
 									ok = true
 								}
 							}
+							subsystemReq := &subsystemRequest{}
+							if err := ssh.Unmarshal(req.Payload, subsystemReq); err == nil {
+								subsystemName = subsystemReq.Name
+							}
 						}
+						m.lg.InfoD("session-request", meta{
+							"request-type": req.Type,
+							"accepted":     ok,
+							"subsystem":    subsystemName,
+							"username":     sshConn.User(),
+							"client-ip":    sshConn.RemoteAddr().String(),
+						})
 						req.Reply(ok, nil)
 					}
 				}(requests)

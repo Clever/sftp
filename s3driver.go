@@ -38,9 +38,48 @@ type S3Driver struct {
 	lg              Logger
 }
 
+// logOpError logs a failed S3 operation at error level with district context.
+func (d S3Driver) logOpError(title, method, path string, err error, extra meta) {
+	if d.lg == nil {
+		return
+	}
+	ip, port := getIPAndPort(d.remoteIPAddress)
+	m := meta{
+		"district_id": d.prefix,
+		"s3_bucket":   d.bucket,
+		"method":      method,
+		"path":        path,
+		"client-ip":   ip,
+		"client-port": port,
+		"error":       err.Error(),
+	}
+	for k, v := range extra {
+		m[k] = v
+	}
+	d.lg.ErrorD(title, m)
+}
+
+// logNotFound logs at info level that a requested object does not exist in S3.
+// Logged at info rather than error to prevent overwhelming the logs with non-errors.
+func (d S3Driver) logNotFound(method, path string) {
+	if d.lg == nil {
+		return
+	}
+	ip, port := getIPAndPort(d.remoteIPAddress)
+	d.lg.InfoD("s3-stat-not-found", meta{
+		"district_id": d.prefix,
+		"s3_bucket":   d.bucket,
+		"method":      method,
+		"path":        path,
+		"client-ip":   ip,
+		"client-port": port,
+	})
+}
+
 func (d S3Driver) Stat(path string) (os.FileInfo, error) {
 	localPath, err := TranslatePath(d.prefix, d.homePath, path)
 	if err != nil {
+		d.logOpError("s3-stat-error", "STAT", path, err, nil)
 		return nil, err
 	}
 
@@ -50,10 +89,12 @@ func (d S3Driver) Stat(path string) (os.FileInfo, error) {
 		MaxKeys: aws.Int32(1),
 	})
 	if err != nil {
+		d.logOpError("s3-stat-error", "STAT", localPath, err, nil)
 		return nil, err
 	}
 
 	if resp.Contents == nil || *resp.KeyCount == 0 {
+		d.logNotFound("STAT", localPath)
 		return nil, os.ErrNotExist
 	}
 
@@ -151,10 +192,12 @@ func (d S3Driver) DeleteFile(path string) error {
 func (d S3Driver) Rename(oldpath string, newpath string) error {
 	translatedOldpath, err := TranslatePath(d.prefix, d.homePath, oldpath)
 	if err != nil {
+		d.logOpError("s3-rename-error", "RENAME", oldpath, err, nil)
 		return err
 	}
 	translatedNewpath, err := TranslatePath(d.prefix, d.homePath, newpath)
 	if err != nil {
+		d.logOpError("s3-rename-error", "RENAME", translatedOldpath, err, meta{"new_path": newpath})
 		return err
 	}
 	input := &s3.CopyObjectInput{
@@ -169,6 +212,7 @@ func (d S3Driver) Rename(oldpath string, newpath string) error {
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
 	if _, err := d.s3.CopyObject(context.Background(), input); err != nil {
+		d.logOpError("s3-rename-error", "RENAME", translatedOldpath, err, meta{"new_path": translatedNewpath})
 		return err
 	}
 
@@ -176,6 +220,7 @@ func (d S3Driver) Rename(oldpath string, newpath string) error {
 		Bucket: aws.String(d.bucket),
 		Key:    &translatedOldpath,
 	}); err != nil {
+		d.logOpError("s3-rename-error", "RENAME", translatedOldpath, err, meta{"new_path": translatedNewpath})
 		return err
 	}
 
@@ -185,6 +230,7 @@ func (d S3Driver) Rename(oldpath string, newpath string) error {
 func (d S3Driver) MakeDir(path string) error {
 	localPath, err := TranslatePath(d.prefix, d.homePath, path)
 	if err != nil {
+		d.logOpError("s3-make-dir-error", "MKDIR", path, err, nil)
 		return err
 	}
 	if !strings.HasSuffix(localPath, "/") {
@@ -202,6 +248,9 @@ func (d S3Driver) MakeDir(path string) error {
 		input.SSEKMSKeyId = aws.String(*d.kmsKeyID)
 	}
 	_, err = d.s3.PutObject(context.Background(), input)
+	if err != nil {
+		d.logOpError("s3-make-dir-error", "MKDIR", localPath, err, nil)
+	}
 	return err
 }
 
@@ -298,11 +347,13 @@ func (d S3Driver) GetFile(path string) (io.ReadCloser, error) {
 func (d S3Driver) PutFile(path string, r io.Reader) error {
 	localPath, err := TranslatePath(d.prefix, d.homePath, path)
 	if err != nil {
+		d.logOpError("s3-put-file-error", "PUT", path, err, nil)
 		return err
 	}
 
 	rawData, err := ioutil.ReadAll(r)
 	if err != nil {
+		d.logOpError("s3-put-file-error", "PUT", localPath, err, nil)
 		return err
 	}
 	input := &s3.PutObjectInput{
@@ -318,6 +369,7 @@ func (d S3Driver) PutFile(path string, r io.Reader) error {
 	}
 	_, err = d.s3.PutObject(context.Background(), input)
 	if err != nil {
+		d.logOpError("s3-put-file-error", "PUT", localPath, err, nil)
 		return err
 	}
 	ip, port := getIPAndPort(d.remoteIPAddress)
